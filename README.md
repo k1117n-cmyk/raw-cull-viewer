@@ -1,5 +1,8 @@
 # RAW Cull Viewer
 
+![macOS](https://img.shields.io/badge/macOS-supported-000000?logo=apple&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-25%2B-339933?logo=node.js&logoColor=white)
+
 NX Studioの代わりに、RAWファイルを軽く選別するためのローカルビューアです。
 
 Nikon NEFなどのRAWから表示用JPEGを生成し、ブラウザ上でキーボード中心に画像を確認できます。
