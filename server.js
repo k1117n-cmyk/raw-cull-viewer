@@ -41,7 +41,6 @@ const supportedExts = new Set([
   ".tiff",
 ]);
 
-const directImageExts = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"]);
 const mimeByExt = new Map([
   [".html", "text/html; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
@@ -201,12 +200,12 @@ async function listFolders(dir = rootDir) {
 }
 
 function previewBaseName(filePath, stat) {
-  const source = `v900-orientation:${filePath}:${stat.size}:${stat.mtimeMs}`;
+  const source = `v900-physical-preview:${filePath}:${stat.size}:${stat.mtimeMs}`;
   return createHash("sha1").update(source).digest("hex");
 }
 
 async function makePreviewWithSips(input, output) {
-  await execFileAsync("/usr/bin/sips", ["-s", "format", "jpeg", "-Z", "2400", input, "--out", output], {
+  await execFileAsync("/usr/bin/sips", ["-s", "format", "jpeg", "-Z", "900", input, "--out", output], {
     timeout: 30000,
     maxBuffer: 1024 * 1024,
   });
@@ -295,11 +294,6 @@ async function makePreviewWithQuickLook(input, output) {
 
 async function previewFor(relativeFile) {
   const absolute = resolveSafe(relativeFile);
-  const ext = path.extname(absolute).toLowerCase();
-
-  if (directImageExts.has(ext)) {
-    return { path: absolute, mime: mimeByExt.get(ext) || "application/octet-stream", relative: relativeFile };
-  }
 
   await fs.mkdir(cacheDir, { recursive: true });
   const stat = await fs.stat(absolute);

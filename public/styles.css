@@ -61,10 +61,10 @@ button:disabled {
 
 .stage {
   position: relative;
-  display: flex;
+  display: block;
   height: 100%;
-  align-items: center;
-  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
@@ -72,11 +72,9 @@ button:disabled {
 
 #preview {
   display: none;
-  max-width: 100%;
-  max-height: 100%;
   width: auto;
   height: auto;
-  object-fit: contain;
+  margin-inline: auto;
   position: relative;
   z-index: 1;
 }
@@ -84,7 +82,10 @@ button:disabled {
 .empty {
   color: var(--muted);
   font-size: 15px;
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 2;
 }
 

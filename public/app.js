@@ -5,10 +5,14 @@ const state = {
   files: [],
   index: 0,
   loadingToken: 0,
-  livePreview: null,
+  preloadToken: 0,
+  hasPreview: false,
+  previewCache: new Map(),
 };
 
-const previewVersion = "19";
+const previewVersion = "27";
+const preloadAhead = 10;
+const maxPreviewCache = 18;
 
 const els = {
   root: document.querySelector("#root"),
@@ -48,48 +52,132 @@ function currentFolder() {
   return state.folders[state.folderIndex]?.path || "";
 }
 
+function previewKey(file) {
+  return `${file.path}:${file.mtimeMs}:${previewVersion}`;
+}
+
+function previewUrlRequest(file) {
+  return `/api/preview-url?file=${encodeURIComponent(file.path)}&t=${encodeURIComponent(file.mtimeMs)}&v=${previewVersion}`;
+}
+
+function addPreviewParams(url, file) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}v=${encodeURIComponent(previewVersion)}&t=${encodeURIComponent(file.mtimeMs)}`;
+}
+
 function setMessage(message) {
   els.preview.style.display = "none";
   els.preview.removeAttribute("src");
   els.stage.style.backgroundImage = "";
-  if (state.livePreview) {
-    state.livePreview.remove();
-    state.livePreview = null;
-  }
+  state.hasPreview = false;
   els.debugLink.style.display = "none";
   els.empty.style.display = "block";
   els.empty.textContent = message;
 }
 
-function showPreview(url) {
-  if (!state.livePreview) {
-    state.livePreview = document.createElement("iframe");
-    state.livePreview.title = "Preview";
-    state.livePreview.setAttribute(
-      "style",
-      [
-        "position:absolute",
-        "inset:0",
-        "display:block",
-        "width:100%",
-        "height:100%",
-        "max-width:none",
-        "max-height:none",
-        "border:0",
-        "background:#0b0b0b",
-        "z-index:1",
-      ].join(";"),
-    );
-    els.stage.prepend(state.livePreview);
+function setLoadingMessage(message) {
+  if (state.hasPreview) {
+    els.empty.style.display = "none";
+    return;
   }
-  state.livePreview.src = url;
+  els.empty.style.display = "block";
+  els.empty.textContent = message;
+}
+
+function preparePreviewImage(img) {
+  img.alt = "";
+  img.decoding = "async";
+}
+
+async function loadPreview(file) {
+  const key = previewKey(file);
+  const cached = state.previewCache.get(key);
+  if (cached) return cached.promise;
+
+  const entry = {
+    key,
+    file,
+    url: "",
+    img: null,
+    promise: null,
+  };
+
+  entry.promise = (async () => {
+    const response = await fetch(previewUrlRequest(file), { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `${response.status} ${response.statusText}`);
+    }
+
+    const url = addPreviewParams(data.url, file);
+    const img = new Image();
+    preparePreviewImage(img);
+    await new Promise((resolve, reject) => {
+      img.addEventListener("load", resolve, { once: true });
+      img.addEventListener("error", () => reject(new Error(`画像を読み込めませんでした: ${file.name}`)), { once: true });
+      img.src = url;
+    });
+
+    entry.url = url;
+    entry.img = img;
+    return entry;
+  })();
+
+  state.previewCache.set(key, entry);
+  return entry.promise;
+}
+
+function prunePreviewCache() {
+  const keep = new Set();
+  const start = Math.max(0, state.index - 2);
+  const end = Math.min(state.files.length - 1, state.index + preloadAhead);
+  for (let index = start; index <= end; index += 1) {
+    keep.add(previewKey(state.files[index]));
+  }
+
+  for (const key of state.previewCache.keys()) {
+    if (state.previewCache.size <= maxPreviewCache) return;
+    if (!keep.has(key)) state.previewCache.delete(key);
+  }
+}
+
+function preloadUpcoming() {
+  prunePreviewCache();
+  const token = ++state.preloadToken;
+  const targets = [];
+  const end = Math.min(state.files.length - 1, state.index + preloadAhead);
+  for (let index = state.index + 1; index <= end; index += 1) {
+    const file = state.files[index];
+    if (!state.previewCache.has(previewKey(file))) targets.push(file);
+  }
+
+  let next = 0;
+  const workerCount = Math.min(2, targets.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (next < targets.length && token === state.preloadToken) {
+      const file = targets[next];
+      next += 1;
+      try {
+        await loadPreview(file);
+      } catch {
+        state.previewCache.delete(previewKey(file));
+      }
+    }
+  });
+  Promise.all(workers).catch(() => {});
+}
+
+function showPreview(entry) {
   els.stage.style.backgroundImage = "";
-  els.preview.style.display = "none";
-  els.preview.removeAttribute("src");
-  els.debugLink.href = url;
-  els.debugLink.textContent = url.startsWith("data:") ? "data-url preview" : url;
+  els.preview.src = entry.url;
+  els.preview.style.display = "block";
+  state.hasPreview = true;
+  els.debugLink.href = entry.url;
+  els.debugLink.textContent = entry.url.startsWith("data:") ? "data-url preview" : entry.url;
   els.debugLink.style.display = "block";
-  els.details.textContent = url.startsWith("data:") ? `JPEG data loaded (${Math.round(url.length / 1024)} KB)` : url;
+  els.details.textContent = entry.url.startsWith("data:")
+    ? `JPEG data loaded (${Math.round(entry.url.length / 1024)} KB)`
+    : entry.url;
   els.empty.style.display = "none";
 }
 
@@ -164,6 +252,8 @@ async function loadFiles(keepPath) {
 
   state.root = data.root;
   state.files = data.files;
+  state.preloadToken += 1;
+  state.previewCache.clear();
   const keepIndex = keepPath ? state.files.findIndex((file) => file.path === keepPath) : -1;
   state.index = keepIndex >= 0 ? keepIndex : Math.min(state.index, Math.max(state.files.length - 1, 0));
   renderStrip();
@@ -200,21 +290,16 @@ async function show(index) {
   const token = ++state.loadingToken;
   updateMeta();
   renderStrip();
-  setMessage("プレビュー生成中");
-
-  const url = `/api/preview-url?file=${encodeURIComponent(file.path)}&t=${encodeURIComponent(file.mtimeMs)}&v=${previewVersion}`;
+  setLoadingMessage("プレビュー生成中");
 
   try {
-    const response = await fetch(url, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `${response.status} ${response.statusText}`);
-    }
+    const entry = await loadPreview(file);
     if (token !== state.loadingToken) return;
-    const imageUrl = `${data.url}?v=${previewVersion}&_=${Date.now()}`;
-    showPreview(imageUrl);
+    showPreview(entry);
+    preloadUpcoming();
   } catch (error) {
     if (token !== state.loadingToken) return;
+    state.previewCache.delete(previewKey(file));
     setMessage(error.message || `プレビューを生成できませんでした: ${file.name}`);
   }
 }
