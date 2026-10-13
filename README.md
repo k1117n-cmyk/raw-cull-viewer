@@ -95,6 +95,12 @@ rm -rf "/path/to/raw-folder/.viewer-cache"
 
 ## Supported Files
 
+主にNikon NEFで動作確認しています。
+
+コード上はARW、CR2、CR3、RAF、RW2、ORF、DNGなども対象にしていますが、実機データでの動作確認は未実施です。
+
+そのため、Nikon以外のRAW形式は動作する可能性はありますが、現時点では動作保証外です。
+
 RAW:
 
 ```text
