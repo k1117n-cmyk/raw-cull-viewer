@@ -56,6 +56,13 @@ http://127.0.0.1:5173
 RAW_FOLDER="/path/to/raw-folder" ./start-d4.sh
 ```
 
+複数のカメラや保存先を使い分けている場合は、カメラの機種名や用途ごとに起動スクリプトを分けておくと便利です。
+
+```bash
+cp start-d4.sh start-camera-name.sh
+RAW_FOLDER="/path/to/raw-folder" ./start-camera-name.sh
+```
+
 ## Keyboard
 
 - `j`: 次の画像
