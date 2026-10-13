@@ -38,28 +38,22 @@ brew install imagemagick exiftool
 npm start -- "/path/to/raw-folder"
 ```
 
-例:
-
-```bash
-npm start -- "/Volumes/SHARE1TB/D4"
-```
-
 起動後、表示されたURLをブラウザで開きます。
 
 ```text
 http://127.0.0.1:5173
 ```
 
-このリポジトリにはD4用の起動スクリプトも含まれています。
+このリポジトリには、起動と同時にブラウザを開くための補助スクリプトも含まれています。
 
 ```bash
-./start-d4.sh
+./start-d4.sh "/path/to/raw-folder"
 ```
 
-別フォルダ用に作る場合はコピーしてパスを書き換えます。
+環境変数で指定することもできます。
 
 ```bash
-cp start-d4.sh start-d7000.sh
+RAW_FOLDER="/path/to/raw-folder" ./start-d4.sh
 ```
 
 ## Keyboard
