@@ -10,7 +10,7 @@ const state = {
   previewCache: new Map(),
 };
 
-const previewVersion = "27";
+const previewVersion = "28";
 const preloadAhead = 10;
 const maxPreviewCache = 18;
 

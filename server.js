@@ -200,7 +200,7 @@ async function listFolders(dir = rootDir) {
 }
 
 function previewBaseName(filePath, stat) {
-  const source = `v900-physical-preview:${filePath}:${stat.size}:${stat.mtimeMs}`;
+  const source = `v900-ifd0-orientation:${filePath}:${stat.size}:${stat.mtimeMs}`;
   return createHash("sha1").update(source).digest("hex");
 }
 
@@ -212,15 +212,18 @@ async function makePreviewWithSips(input, output) {
 }
 
 async function readOrientation(input) {
-  try {
-    const { stdout } = await execFileAsync("exiftool", ["-s3", "-Orientation", input], {
-      timeout: 10000,
-      maxBuffer: 1024 * 1024,
-    });
-    return stdout.trim();
-  } catch {
-    return "";
+  for (const tag of ["-IFD0:Orientation", "-Orientation"]) {
+    try {
+      const { stdout } = await execFileAsync("exiftool", ["-s3", tag, input], {
+        timeout: 10000,
+        maxBuffer: 1024 * 1024,
+      });
+      if (stdout.trim()) return stdout.trim();
+    } catch {
+      // Try the next orientation tag.
+    }
   }
+  return "";
 }
 
 function rotationArgsForOrientation(orientation) {
